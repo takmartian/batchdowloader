@@ -227,7 +227,6 @@ class mainFrame(wx.Frame):
 
     def LblProgressOnIdle(self, event):
         self.dlCount.SetLabel("%d/%d" % (self.progress_value, self.progress_range))
-        print(self.progress_value)
 
     def ProgressBarOnIdle(self, event):
         self.progressBar.SetRange(self.progress_range)
@@ -258,17 +257,26 @@ class DownloadImages(Thread):
         urls = df[self.xlsCol]
         names = df[self.xlsNameCol]
         curDLNum = 0
+        failDLNum = 0
+        failNames = ""
 
         for i in range(len(urls)):
-            if urls[i] == "":
+            try:
+                if urls[i] == "":
+                    continue
+                urlSplited = urls[i].split(",")
+                for j in urlSplited:
+                        dotIndex = j.rfind(".")
+                        extName = j[dotIndex:len(j)]
+                        r = requests.request('get', j)
+                        with open(self.dlPath + names[i] + str('img') + str(time.time()) + extName, 'wb') as f:
+                            f.write(r.content)
+                        f.close()
+                curDLNum += 1
+                pub.sendMessage("updateProgress", p_value=curDLNum, p_range=len(urls))
+            except:
+                failDLNum += 1
+                failNames = "%s, %s" % (failNames, names[i])
                 continue
-            urlSplited = urls[i].split(",")
-            for j in urlSplited:
-                dotIndex = j.rfind(".")
-                extName = j[dotIndex:len(j)]
-                r = requests.request('get', j)
-                with open(self.dlPath + names[i] + str('img') + str(time.time()) + extName, 'wb') as f:
-                    f.write(r.content)
-                f.close()
-            curDLNum += 1
-            pub.sendMessage("updateProgress", p_value=curDLNum, p_range=len(urls))
+
+        wx.MessageBox("下载完毕，成功%d条，失败%d条。\n下列是失败清单：\n%s。" % (curDLNum, failDLNum, failNames))
